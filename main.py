@@ -1,5 +1,4 @@
 import numpy as np
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -10,7 +9,7 @@ M = 5.972e24  # Mass of the Earth in kg
 NUM_FRAMES = 300  # Number of frames in animation
 
 
-# Function to calculate motion along the chord
+# Function to calculate gravitational acceleration along the chord
 def gravity_train_motion(surface_distance, num_frames=NUM_FRAMES):
     # Compute theta (central angle) from surface distance
     theta = surface_distance / R_EARTH
@@ -22,14 +21,45 @@ def gravity_train_motion(surface_distance, num_frames=NUM_FRAMES):
     A = np.array([-R_EARTH * np.sin(theta / 2), R_EARTH * np.cos(theta / 2)])
     B = np.array([R_EARTH * np.sin(theta / 2), R_EARTH * np.cos(theta / 2)])
 
-    # Compute total travel time for the specific chord length
-    T_FULL_DIAMETER = np.pi * np.sqrt(R_EARTH**3 / (G * M))  # Time for full diameter
+    # Compute total travel time for the specific chord length (rough estimate)
+    T_FULL_DIAMETER = np.pi * np.sqrt(R_EARTH ** 3 / (G * M))  # Time for full diameter
     T_TOTAL = T_FULL_DIAMETER * (chord_length / (2 * R_EARTH))  # Adjust for chord length
 
-    # Generate time values and positions along the chord
+    # Generate time values for simulation
     t_vals = np.linspace(0, T_TOTAL, num_frames)
-    x_vals = np.linspace(A[0], B[0], num_frames)
-    y_vals = np.linspace(A[1], B[1], num_frames)
+
+    # Initial conditions
+    v = 0  # initial velocity
+    s = 0  # initial position (at A)
+    a = 0  # initial acceleration
+
+    # Arrays to store position and velocity
+    x_vals = np.zeros(num_frames)
+    y_vals = np.zeros(num_frames)
+
+    # Simulate the motion with gravity
+    for i in range(1, num_frames):
+        # Compute the radial distance from Earth's center (based on position along the chord)
+        s_radial = s / chord_length  # Normalized position along chord
+
+        # Gravitational acceleration depends on position along the chord
+        a_gravity = (G * M) / (R_EARTH ** 2) * np.cos(np.pi * s_radial)  # Approximation
+
+        # Update velocity using the gravitational force
+        v += a_gravity * (t_vals[1] - t_vals[0])  # Velocity update (simplified)
+
+        # Update position using velocity (simple model)
+        s += v * (t_vals[1] - t_vals[0])  # Position update along the chord
+
+        # Ensure the position does not go beyond the limits of the chord
+        if s > chord_length:
+            s = chord_length
+        elif s < 0:
+            s = 0
+
+        # Calculate the corresponding (x, y) position on the chord
+        x_vals[i] = A[0] + (B[0] - A[0]) * (s / chord_length)
+        y_vals[i] = A[1] + (B[1] - A[1]) * (s / chord_length)
 
     return t_vals, x_vals, y_vals, A, B, T_TOTAL  # Include total travel time
 
@@ -47,9 +77,9 @@ def on_complete(*args):
 
 
 # Define surface distance (adjustable)
-surface_distance = 8000e3  # in km (Great-circle distance)
+surface_distance = 8000e3  # in meters (Great-circle distance)
 
-# Compute motion data
+# Compute motion data with gravity effects
 t_vals, x_vals, y_vals, A, B, T_TOTAL = gravity_train_motion(surface_distance)
 
 # Set up plot
@@ -85,4 +115,4 @@ ani = animation.FuncAnimation(fig, update_frame, frames=len(t_vals), interval=50
 # Add callback to show total time at the end
 ani.event_source.add_callback(on_complete)
 
-plt.show()
+plt.show() 
