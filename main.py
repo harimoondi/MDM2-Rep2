@@ -47,7 +47,7 @@ def on_complete(*args):
 
 
 # Define surface distance (adjustable)
-surface_distance = 7000e3  # 8000 km (Great-circle distance)
+surface_distance = 8000e3  # in km (Great-circle distance)
 
 # Compute motion data
 t_vals, x_vals, y_vals, A, B, T_TOTAL = gravity_train_motion(surface_distance)
