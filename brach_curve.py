@@ -12,13 +12,12 @@ with open(file_path, "rb") as f:
 
 r_earth = 6371000  # Earth radius in meters
 
-# Define initial and final points with correct coordinates
-# Bristol: 51.4545° N, 2.5879° W
-# Sao Paulo: 23.5558° S, 46.6396° W
-init_lat = 51.4545   # North is positive
-init_lon = -2.5879   # West is negative
-final_lat = -23.5558  # South is negative
-final_lon = -46.6396  # West is negative
+# Define initial and final points with approximately antipodal coordinates
+# For example: Jakarta, Indonesia to Quito, Ecuador (nearly antipodal)
+init_lat = -6.2088    # Jakarta: 6.2088° S
+init_lon = 106.8456   # Jakarta: 106.8456° E
+final_lat = -0.1807   # Quito: 0.1807° S
+final_lon = -78.4678  # Quito: 78.4678° W
 
 # Convert to radians
 theta_init = np.radians(90 - init_lat)
