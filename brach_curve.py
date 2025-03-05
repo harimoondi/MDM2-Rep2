@@ -3,6 +3,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.integrate import cumulative_trapezoid
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 # Load the gravity function
 file_path = "Gravity and Density Functions/functions/earth_gravity_fit.pkl"
@@ -11,13 +12,12 @@ with open(file_path, "rb") as f:
 
 r_earth = 6371000  # Earth radius in meters
 
-# Define initial and final points with correct coordinates
-# Bristol: 51.4545° N, 2.5879° W
-# Sao Paulo: 23.5558° S, 46.6396° W
-init_lat = 51.4545   # North is positive
-init_lon = -2.5879   # West is negative
-final_lat = -23.5558  # South is negative
-final_lon = -46.6396  # West is negative
+# Define initial and final points with approximately antipodal coordinates
+# For example: Jakarta, Indonesia to Quito, Ecuador (nearly antipodal)
+init_lat = -6.2088    # Jakarta: 6.2088° S
+init_lon = 106.8456   # Jakarta: 106.8456° E
+final_lat = -0.1807   # Quito: 0.1807° S
+final_lon = -78.4678  # Quito: 78.4678° W
 
 # Convert to radians
 theta_init = np.radians(90 - init_lat)
@@ -178,8 +178,12 @@ def optimize_path():
 
     return optimized_r_values
 
-
-
+# Convert spherical to cartesian coordinates for the tunnel path
+def spherical_to_cartesian(r, theta, phi):
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+    return x, y, z
 
 
 # Main execution
@@ -198,15 +202,150 @@ print(f"Optimized travel time: {travel_time:.2f} seconds ({travel_time / 60:.2f}
 max_depth = r_earth - np.min(optimized_r)
 print(f"Maximum tunnel depth: {max_depth:.2f} meters ({max_depth / 1000:.2f} km)")
 
+# Calculate depths for plotting
+depths = r_earth - optimized_r  # in meters
+depths_km = depths / 1000  # convert to km for better readability
 
-# Convert spherical to cartesian coordinates for the tunnel path
+# Calculate radial acceleration component (pointing toward Earth's center)
+radial_acceleration_magnitude = gravity_function(optimized_r)
 
-def spherical_to_cartesian(r, theta, phi):
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-    return x, y, z
+# Calculate velocity profile
+v_values = velocity(optimized_r)
 
+# Convert path to Cartesian coordinates for easier vector calculations
+x_tunnel, y_tunnel, z_tunnel = spherical_to_cartesian(optimized_r, theta_values, phi_values)
+
+# Calculate velocity vector components using path derivatives
+dx_dt = np.gradient(x_tunnel)
+dy_dt = np.gradient(y_tunnel)
+dz_dt = np.gradient(z_tunnel)
+
+# Normalize velocity vectors to get direction
+v_magnitudes = np.sqrt(dx_dt**2 + dy_dt**2 + dz_dt**2)
+v_normalized = np.zeros((len(optimized_r), 3))
+for i in range(len(optimized_r)):
+    if v_magnitudes[i] > 0:
+        v_normalized[i,0] = dx_dt[i] / v_magnitudes[i]
+        v_normalized[i,1] = dy_dt[i] / v_magnitudes[i]
+        v_normalized[i,2] = dz_dt[i] / v_magnitudes[i]
+
+# Second derivatives for curvature calculation
+d2x_dt2 = np.gradient(dx_dt)
+d2y_dt2 = np.gradient(dy_dt)
+d2z_dt2 = np.gradient(dz_dt)
+
+# Initialize arrays for different acceleration components
+tangential_gravity_vec = np.zeros((len(optimized_r), 3))
+centripetal_vec = np.zeros((len(optimized_r), 3))
+total_acc_vec = np.zeros((len(optimized_r), 3))
+
+# Calculate and store acceleration magnitudes for plotting
+tangential_gravity_mag = np.zeros(len(optimized_r))
+centripetal_acc_mag = np.zeros(len(optimized_r))
+total_acc_mag = np.zeros(len(optimized_r))
+
+for i in range(len(optimized_r)):
+    # Calculate radial unit vector (pointing to Earth's center)
+    r = optimized_r[i]
+    x, y, z = x_tunnel[i], y_tunnel[i], z_tunnel[i]
+    r_vec_length = np.sqrt(x**2 + y**2 + z**2)
+    
+    if r_vec_length > 0:
+        # Radial unit vector (points toward Earth's center)
+        r_unit_x = -x / r_vec_length
+        r_unit_y = -y / r_vec_length
+        r_unit_z = -z / r_vec_length
+        
+        # Gravitational acceleration vector (radial direction)
+        g_vec_x = radial_acceleration_magnitude[i] * r_unit_x
+        g_vec_y = radial_acceleration_magnitude[i] * r_unit_y
+        g_vec_z = radial_acceleration_magnitude[i] * r_unit_z
+        
+        # Calculate tangential component of gravity
+        # Project gravity onto velocity direction
+        v_dot_g = (v_normalized[i,0] * g_vec_x + 
+                   v_normalized[i,1] * g_vec_y + 
+                   v_normalized[i,2] * g_vec_z)
+        
+        tangential_gravity_vec[i,0] = v_dot_g * v_normalized[i,0]
+        tangential_gravity_vec[i,1] = v_dot_g * v_normalized[i,1]
+        tangential_gravity_vec[i,2] = v_dot_g * v_normalized[i,2]
+        
+        # Calculate centripetal acceleration vector
+        # Acceleration = d²r/dt² (second derivative of position)
+        acc_x, acc_y, acc_z = d2x_dt2[i], d2y_dt2[i], d2z_dt2[i]
+        
+        # Project acceleration onto normal direction (perpendicular to velocity)
+        acc_dot_v = (acc_x * v_normalized[i,0] + 
+                     acc_y * v_normalized[i,1] + 
+                     acc_z * v_normalized[i,2])
+        
+        normal_acc_x = acc_x - acc_dot_v * v_normalized[i,0]
+        normal_acc_y = acc_y - acc_dot_v * v_normalized[i,1]
+        normal_acc_z = acc_z - acc_dot_v * v_normalized[i,2]
+        
+        # Scale by v²
+        centripetal_vec[i,0] = normal_acc_x * v_values[i]**2
+        centripetal_vec[i,1] = normal_acc_y * v_values[i]**2
+        centripetal_vec[i,2] = normal_acc_z * v_values[i]**2
+        
+        # Total acceleration vector (sum of components)
+        total_acc_vec[i,0] = g_vec_x + centripetal_vec[i,0]
+        total_acc_vec[i,1] = g_vec_y + centripetal_vec[i,1]
+        total_acc_vec[i,2] = g_vec_z + centripetal_vec[i,2]
+        
+        # Calculate magnitudes for plotting
+        tangential_gravity_mag[i] = np.abs(v_dot_g)
+        centripetal_acc_mag[i] = np.sqrt(centripetal_vec[i,0]**2 + 
+                                         centripetal_vec[i,1]**2 + 
+                                         centripetal_vec[i,2]**2)
+        total_acc_mag[i] = np.sqrt(total_acc_vec[i,0]**2 + 
+                                  total_acc_vec[i,1]**2 + 
+                                  total_acc_vec[i,2]**2)
+
+# Define human safety threshold (in m/s²)
+# ~7-9G is typically fatal for untrained individuals with sustained exposure
+human_max_acceleration = 70  # approximately 7G (70 m/s²)
+
+# Create plots for acceleration vs depth
+plt.figure(figsize=(15, 12))
+
+# Plot 1: Radial gravitational acceleration vs depth
+plt.subplot(3, 1, 1)
+plt.plot(depths_km, radial_acceleration_magnitude, 'b-', linewidth=2)
+plt.grid(True)
+plt.title('Radial Gravitational Acceleration vs Depth')
+plt.xlabel('Depth (km)')
+plt.ylabel('Acceleration (m/s²)')
+plt.xlim(0, max(depths_km)*1.05)
+
+# Plot 2: Component accelerations vs depth
+plt.subplot(3, 1, 2)
+plt.plot(depths_km, tangential_gravity_mag, 'g-', linewidth=2, label='Tangential Gravity')
+plt.plot(depths_km, centripetal_acc_mag, 'r-', linewidth=2, label='Centripetal')
+plt.axhline(y=human_max_acceleration, color='r', linestyle='--', linewidth=1.5)
+plt.text(max(depths_km)*0.02, human_max_acceleration*1.05, "Human Safety Limit (~7G)", color='r')
+plt.grid(True)
+plt.title('Centripetal and Gravitational Acceleration vs Depth')
+plt.xlabel('Depth (km)')
+plt.ylabel('Acceleration (m/s²)')
+plt.legend()
+plt.xlim(0, max(depths_km)*1.05)
+
+# Plot 3: Total acceleration magnitude vs depth
+plt.subplot(3, 1, 3)
+plt.plot(depths_km, total_acc_mag, 'k-', linewidth=2)
+plt.axhline(y=human_max_acceleration, color='r', linestyle='--', linewidth=1.5)
+plt.text(max(depths_km)*0.02, human_max_acceleration*1.05, "Human Safety Limit (~7G)", color='r')
+plt.grid(True)
+plt.title('Total Acceleration Magnitude vs Depth')
+plt.xlabel('Depth (km)')
+plt.ylabel('Acceleration (m/s²)')
+plt.xlim(0, max(depths_km)*1.05)
+
+plt.tight_layout()
+plt.savefig('vectorized_acceleration_analysis.png', dpi=300)
+plt.show()
 
 # Calculate tunnel path
 x_tunnel, y_tunnel, z_tunnel = spherical_to_cartesian(optimized_r, theta_values, phi_values)

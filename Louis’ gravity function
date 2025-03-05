@@ -1,0 +1,39 @@
+# Implementing Louis' gravity function (assuming a modified gravity model)
+# Placeholder for Louis' function (replace with actual function if provided)
+def louis_gravity_function(r):
+    """Modified gravity function based on Louis' model (assumed)."""
+    return g * (r / R)  # Linear gravity model as an example
+
+# Function to compute velocity using Louis' gravity model
+def velocity_louis_model(r):
+    """Velocity calculation using Louis' gravity model."""
+    return np.sqrt(2 * (R - r) * louis_gravity_function(r))
+
+# Function to compute acceleration using Louis' gravity model
+def acceleration_louis_model(r):
+    """Acceleration calculation using Louis' gravity model."""
+    return louis_gravity_function(r)  # Directly using modified gravity function
+
+# Compute values for visualization
+r_values = np.linspace(0, R, 100)  # Radius values inside Earth
+velocities = velocity_louis_model(r_values)
+accelerations = acceleration_louis_model(r_values)
+
+# Plot velocity and acceleration using Louis' gravity function
+plt.figure(figsize=(8, 6))
+plt.plot(r_values / 1e3, velocities, label="Velocity (m/s)", color="blue")
+plt.xlabel("Radius (km)")
+plt.ylabel("Velocity (m/s)")
+plt.title("Velocity Profile using Louis' Gravity Model")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(8, 6))
+plt.plot(r_values / 1e3, accelerations, label="Acceleration (m/s²)", color="red")
+plt.xlabel("Radius (km)")
+plt.ylabel("Acceleration (m/s²)")
+plt.title("Acceleration Profile using Louis' Gravity Model")
+plt.legend()
+plt.grid(True)
+plt.show()
