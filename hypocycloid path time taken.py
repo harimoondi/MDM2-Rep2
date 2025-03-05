@@ -1,39 +1,67 @@
 import numpy as np
-import pandas as pd
+import scipy.integrate as spi
+import geopy.distance
 import matplotlib.pyplot as plt
 
 # Constants
-R = 6371e3  # Earth's radius in m
-g = 9.81  # Surface gravity in m/s^2
+g = 9.81  # m/s² (gravity at Earth's surface)
+R = 6371000  # m (Earth's radius)
+b = R / 3  # Hypocycloid rolling circle radius
 
-# Function to compute travel time for a chord-like tunnel
-def travel_time_chord(distance):
-    """Compute travel time for a chord-like tunnel using the hypocycloid model."""
-    b = distance / (2 * np.pi)  # Inner rolling circle radius from the hypocycloid equation
-    if b >= R:
-        raise ValueError("Distance is too large for a chord-like tunnel Use the straight-line tunnel instead.")
-    # time calculation
-    time = (2 * np.pi / R) * np.sqrt(R*(R-b)/(g*b))
-    return time * 60  # Convert time to minutes
+# Function to convert lat/lon to Cartesian coordinates (Earth-centered)
+def latlon_to_cartesian(lat, lon):
+    lat, lon = np.radians(lat), np.radians(lon)
+    x = R * np.cos(lat) * np.cos(lon)
+    y = R * np.cos(lat) * np.sin(lon)
+    z = R * np.sin(lat)
+    return np.array([x, y, z])
 
-# Test cases 
-distances_km = {
-    "New York to Los Angeles": 4800,
-    "London to Tokyo": 9600,
-    "Sydney to Cape Town": 11600,
-    "Paris to Beijing": 8200
-}
+# Function to compute arc angle between two cities
+def compute_arc_angle(cityA, cityB):
+    A = latlon_to_cartesian(*cityA)
+    B = latlon_to_cartesian(*cityB)
+    angle = np.arccos(np.dot(A, B) / (R**2))  # Arc angle in radians
+    return angle
 
-# Convert distances to meters and compute travel times
-travel_times = {}
-for city_pair, dist in distances_km.items():
-    try:
-        travel_times[city_pair] = travel_time_chord(dist * 1e3)
-    except ValueError as e:
-        travel_times[city_pair] = str(e)  # Store the error message instead of the time
+# Hypocycloid parametric equations
+def x(t, theta):
+    return (R - b) * np.cos(t) + b * np.cos(((R - b) / b) * t)
 
-# Results
-Time_result = pd.DataFrame(travel_times.items(), columns=["City Pair", "Travel Time (mins) or Error"])
+def y(t, theta):
+    return (R - b) * np.sin(t) - b * np.sin(((R - b) / b) * t)
 
-# Print results
-print(Time_result.to_string(index=False))
+# First derivatives
+def dx_dt(t, theta):
+    return -(R - b) * np.sin(t) - b * ((R - b) / b) * np.sin(((R - b) / b) * t)
+
+def dy_dt(t, theta):
+    return (R - b) * np.cos(t) - b * ((R - b) / b) * np.cos(((R - b) / b) * t)
+
+# Arc length element ds
+def ds_dt(t, theta):
+    return np.sqrt(dx_dt(t, theta)**2 + dy_dt(t, theta)**2)
+
+# Velocity function using energy conservation
+def velocity(r):
+    return np.sqrt((g / R) * (R**2 - r**2))
+
+# Travel time integral function
+def travel_time_integrand(t, theta):
+    r = np.sqrt(x(t, theta)**2 + y(t, theta)**2)  # Compute r from parametric equations
+    return ds_dt(t, theta) / velocity(r)
+
+# Function to compute travel time between two cities
+def compute_travel_time(cityA, cityB):
+    theta = compute_arc_angle(cityA, cityB)  # Arc angle between cities
+    T, _ = spi.quad(travel_time_integrand, 0, theta, args=(theta,))
+    return T
+
+# Example cities (latitude, longitude)
+city_A = (51.509865, -0.118092)  # London, UK
+city_B = (40.712776, -74.005974) # New York, USA
+
+# Compute travel time
+T = compute_travel_time(city_A, city_B)
+
+# Display results
+print(f"Estimated travel time between {city_A} and {city_B} (hypocycloid path): {T / 60:.2f} minutes")
