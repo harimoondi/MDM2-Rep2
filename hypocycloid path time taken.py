@@ -1,67 +1,62 @@
 import numpy as np
 import scipy.integrate as spi
-import geopy.distance
-import matplotlib.pyplot as plt
 
 # Constants
 g = 9.81  # m/s² (gravity at Earth's surface)
 R = 6371000  # m (Earth's radius)
-b = R / 3  # Hypocycloid rolling circle radius
 
-# Function to convert lat/lon to Cartesian coordinates (Earth-centered)
-def latlon_to_cartesian(lat, lon):
-    lat, lon = np.radians(lat), np.radians(lon)
-    x = R * np.cos(lat) * np.cos(lon)
-    y = R * np.cos(lat) * np.sin(lon)
-    z = R * np.sin(lat)
-    return np.array([x, y, z])
+# Function to compute arc angle
+def compute_arc_angle(d):
+    return (d * 1000) / R  # Convert km to meters, then compute arc angle in radians
 
-# Function to compute arc angle between two cities
-def compute_arc_angle(cityA, cityB):
-    A = latlon_to_cartesian(*cityA)
-    B = latlon_to_cartesian(*cityB)
-    angle = np.arccos(np.dot(A, B) / (R**2))  # Arc angle in radians
-    return angle
+# Compute best b dynamically (physics-based)
+def compute_best_b(d):
+    theta = compute_arc_angle(d)
+    alpha = 0.5  # Scaling factor (can be tuned)
+    b = alpha * R * np.sin(theta / 2)
+    return min(R, b)  # Ensure b ≤ R
 
 # Hypocycloid parametric equations
-def x(t, theta):
+def x(t, theta, b):
     return (R - b) * np.cos(t) + b * np.cos(((R - b) / b) * t)
 
-def y(t, theta):
+def y(t, theta, b):
     return (R - b) * np.sin(t) - b * np.sin(((R - b) / b) * t)
 
 # First derivatives
-def dx_dt(t, theta):
+def dx_dt(t, theta, b):
     return -(R - b) * np.sin(t) - b * ((R - b) / b) * np.sin(((R - b) / b) * t)
 
-def dy_dt(t, theta):
+def dy_dt(t, theta, b):
     return (R - b) * np.cos(t) - b * ((R - b) / b) * np.cos(((R - b) / b) * t)
 
 # Arc length element ds
-def ds_dt(t, theta):
-    return np.sqrt(dx_dt(t, theta)**2 + dy_dt(t, theta)**2)
+def ds_dt(t, theta, b):
+    return np.sqrt(dx_dt(t, theta, b)**2 + dy_dt(t, theta, b)**2)
 
 # Velocity function using energy conservation
 def velocity(r):
     return np.sqrt((g / R) * (R**2 - r**2))
 
 # Travel time integral function
-def travel_time_integrand(t, theta):
-    r = np.sqrt(x(t, theta)**2 + y(t, theta)**2)  # Compute r from parametric equations
-    return ds_dt(t, theta) / velocity(r)
+def travel_time_integrand(t, theta, b):
+    r = np.sqrt(x(t, theta, b)**2 + y(t, theta, b)**2)
+    return ds_dt(t, theta, b) / velocity(r)
 
-# Function to compute travel time between two cities
-def compute_travel_time(cityA, cityB):
-    theta = compute_arc_angle(cityA, cityB)  # Arc angle between cities
-    T, _ = spi.quad(travel_time_integrand, 0, theta, args=(theta,))
-    return T
+# Compute travel time with best b
+def compute_travel_time(d):
+    theta = compute_arc_angle(d)
+    b_optimal = compute_best_b(d)
+    T, _ = spi.quad(travel_time_integrand, 0, theta, args=(theta, b_optimal))
+    return T, b_optimal
 
-# Example cities (latitude, longitude)
-city_A = (51.509865, -0.118092)  # London, UK
-city_B = (40.712776, -74.005974) # New York, USA
+# Ask user for straight-line distance
+d = float(input("🌍 Enter the straight-line distance between the two cities (in km): "))
 
-# Compute travel time
-T = compute_travel_time(city_A, city_B)
+# Compute best b and travel time
+T, best_b = compute_travel_time(d)
 
 # Display results
-print(f"Estimated travel time between {city_A} and {city_B} (hypocycloid path): {T / 60:.2f} minutes")
+print(f"\n🚄 Travel Time for Hypocycloid Tunnel over {d} km:")
+print(f"✅ Best rolling circle radius (b): {best_b:.2f} meters")
+print(f"🕒 Estimated travel time: {T / 60:.2f} minutes")
