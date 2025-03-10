@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from scipy.integrate import quad  # Import the quad function for integration
+from scipy.integrate import quad, cumulative_trapezoid  # Import the quad function for integration
 import pickle
 
 # Define DensityFunction class needed for unpickling
@@ -100,3 +100,35 @@ plt.show()
 
 # Print the estimated travel time
 print(f"Estimated travel time for London to New York (using variable gravity): {T_london_ny_minutes:.2f} minutes")
+
+# Compute velocity using energy conservation
+potential_energy = cumulative_trapezoid(g_values, r_values, initial=0)
+velocity = np.sqrt(2 * np.abs(potential_energy))  # Ensure non-negative values
+
+# Compute acceleration
+acceleration = g_values - (velocity**2 / (R_m - r_values))
+
+# Fix axis scaling for better visualization
+r_values_km = r_values / 1000
+
+# Plot Velocity and Acceleration
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 10))
+
+# Velocity plot
+ax1.plot(r_values_km, velocity, label="Velocity (m/s)", color='blue')
+ax1.set_xlabel("Radius (km)")
+ax1.set_ylabel("Velocity (m/s)")
+ax1.set_title("Velocity Along the Hypocycloid Path")
+ax1.grid(True)
+ax1.legend()
+
+# Acceleration plot
+ax2.plot(r_values_km, acceleration, label="Acceleration (m/s²)", color='red')
+ax2.set_xlabel("Radius (km)")
+ax2.set_ylabel("Acceleration (m/s²)")
+ax2.set_title("Acceleration Along the Hypocycloid Path")
+ax2.grid(True)
+ax2.legend()
+
+plt.tight_layout()
+plt.show()
