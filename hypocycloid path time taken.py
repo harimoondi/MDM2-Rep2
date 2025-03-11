@@ -1,62 +1,79 @@
+
 import numpy as np
-import scipy.integrate as spi
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 # Constants
-g = 9.81  # m/s² (gravity at Earth's surface)
-R = 6371000  # m (Earth's radius)
+R_km = 6371  # Earth's radius in km
+R_m = R_km * 1000  # Convert to meters
+g = 9.81  # Acceleration due to gravity in m/s^2
+s_bristol_beijing_km = 8200  # Approximate surface distance between Bristol and Beijing in km
+s_bristol_beijing_m = s_bristol_beijing_km * 1000  # Convert to meters
 
-# Function to compute arc angle
-def compute_arc_angle(d):
-    return (d * 1000) / R  # Convert km to meters, then compute arc angle in radians
+# Compute b based on the hypocycloid property
+b_bristol_beijing_m = s_bristol_beijing_m / (2 * np.pi)  # From the relation θ_AB = s / R
 
-# Compute best b dynamically (physics-based)
-def compute_best_b(d):
-    theta = compute_arc_angle(d)
-    alpha = 0.5  # Scaling factor (can be tuned)
-    b = alpha * R * np.sin(theta / 2)
-    return min(R, b)  # Ensure b ≤ R
+# Parametric equations for the hypocycloid path
+t = np.linspace(0, 2 * np.pi, 1000)  # Parameter t
+x_br_bb = (R_m - b_bristol_beijing_m) * np.cos(t) + b_bristol_beijing_m * np.cos(((R_m - b_bristol_beijing_m) / b_bristol_beijing_m) * t)
+y_br_bb = (R_m - b_bristol_beijing_m) * np.sin(t) - b_bristol_beijing_m * np.sin(((R_m - b_bristol_beijing_m) / b_bristol_beijing_m) * t)
 
-# Hypocycloid parametric equations
-def x(t, theta, b):
-    return (R - b) * np.cos(t) + b * np.cos(((R - b) / b) * t)
+# Compute velocity and acceleration along the path
+dt = t[1] - t[0]  # Time step approximation
+vx = np.gradient(x_br_bb, dt)
+vy = np.gradient(y_br_bb, dt)
+velocity = np.sqrt(vx**2 + vy**2)
 
-def y(t, theta, b):
-    return (R - b) * np.sin(t) - b * np.sin(((R - b) / b) * t)
+ax = np.gradient(vx, dt)
+ay = np.gradient(vy, dt)
+acceleration = np.sqrt(ax**2 + ay**2)
 
-# First derivatives
-def dx_dt(t, theta, b):
-    return -(R - b) * np.sin(t) - b * ((R - b) / b) * np.sin(((R - b) / b) * t)
+# Compute travel time using the theoretical formula
+T_bristol_beijing = np.sqrt((s_bristol_beijing_m / R_m) * ((2 * np.pi * R_m - s_bristol_beijing_m) / g))
+T_bristol_beijing_minutes = T_bristol_beijing / 60  # Convert to minutes
 
-def dy_dt(t, theta, b):
-    return (R - b) * np.cos(t) - b * ((R - b) / b) * np.cos(((R - b) / b) * t)
+# Create figure and axis for animation
+fig, ax = plt.subplots(figsize=(6, 6))
 
-# Arc length element ds
-def ds_dt(t, theta, b):
-    return np.sqrt(dx_dt(t, theta, b)**2 + dy_dt(t, theta, b)**2)
+# Plot the Earth as a circle
+earth_circle = plt.Circle((0, 0), R_m, color='lightblue', alpha=0.5, label="Earth")
+ax.add_patch(earth_circle)
 
-# Velocity function using energy conservation
-def velocity(r):
-    return np.sqrt((g / R) * (R**2 - r**2))
+# Plot the hypocycloid path
+ax.plot(x_br_bb, y_br_bb, label="Hypocycloid Path (Bristol to Beijing)", color='orange')
 
-# Travel time integral function
-def travel_time_integrand(t, theta, b):
-    r = np.sqrt(x(t, theta, b)**2 + y(t, theta, b)**2)
-    return ds_dt(t, theta, b) / velocity(r)
+# Mark start and end points
+ax.scatter([x_br_bb[0], x_br_bb[-1]], [y_br_bb[0], y_br_bb[-1]], color='red', zorder=3, label="Start & End Points")
 
-# Compute travel time with best b
-def compute_travel_time(d):
-    theta = compute_arc_angle(d)
-    b_optimal = compute_best_b(d)
-    T, _ = spi.quad(travel_time_integrand, 0, theta, args=(theta, b_optimal))
-    return T, b_optimal
+# Labels and title
+ax.set_xlabel("x (m)")
+ax.set_ylabel("y (m)")
+ax.set_title("Gravity Train Hypocycloid Path: Bristol to Beijing")
 
-# Ask user for straight-line distance
-d = float(input("🌍 Enter the straight-line distance between the two cities (in km): "))
+# Set axis limits to match Earth's scale
+ax.set_xlim(-R_m * 1.1, R_m * 1.1)
+ax.set_ylim(-R_m * 1.1, R_m * 1.1)
+ax.set_aspect('equal')
 
-# Compute best b and travel time
-T, best_b = compute_travel_time(d)
+# Add legend and grid
+ax.legend()
+ax.grid(True)
 
-# Display results
-print(f"\n🚄 Travel Time for Hypocycloid Tunnel over {d} km:")
-print(f"✅ Best rolling circle radius (b): {best_b:.2f} meters")
-print(f"🕒 Estimated travel time: {T / 60:.2f} minutes")
+# Animation setup
+train, = ax.plot([], [], 'ro', markersize=6)  # Train marker
+time_label = ax.text(-R_m * 0.9, -R_m * 0.9, '', fontsize=12, color='black')
+
+# Animation function
+def update(frame):
+    train.set_data([x_br_bb[frame]], [y_br_bb[frame]])  # Update train position
+    time_label.set_text(f'Time: {frame * (T_bristol_beijing / len(t)):.1f} s')  # Update time label
+    return train, time_label
+
+# Create animation
+ani = animation.FuncAnimation(fig, update, frames=len(t), interval=20, blit=True, repeat=False)
+
+# Show plot
+plt.show()
+
+# Print the estimated travel time
+print(f"Estimated travel time for Bristol to Beijing: {T_bristol_beijing_minutes:.2f} minutes")
