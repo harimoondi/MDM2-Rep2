@@ -47,7 +47,24 @@ surface_distance = 8000e3  # meters
 # Compute train motion data
 t_vals, x_vals, y_vals, velocity_vals, A, B, T_TOTAL, chord_length = gravity_train_motion(surface_distance)
 
-# Set up plot
+# Calculate acceleration by differentiating velocity with respect to time
+acceleration_vals = np.gradient(velocity_vals, t_vals)
+
+# Calculate depth (r) - distance from center of Earth
+r_vals = np.sqrt(x_vals**2 + y_vals**2)
+
+# Create a separate figure for the acceleration vs depth plot
+fig_acc = plt.figure(figsize=(10, 6))
+plt.plot(r_vals, acceleration_vals, 'b-', linewidth=2)
+plt.xlabel('Depth (m)', fontsize=14)
+plt.ylabel('Acceleration (m/s²)', fontsize=14)
+plt.title('Acceleration vs Distance from Center of Earth', fontsize=16)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.savefig('acceleration_vs_depth.png')  # Save the figure as an image
+plt.close(fig_acc)  # Close the figure to avoid displaying it immediately
+
+# Set up plot for animation
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
 
 # Plot 1: Earth and train motion
@@ -93,3 +110,4 @@ ani = animation.FuncAnimation(fig, update_frame, frames=len(t_vals), interval=50
 
 plt.tight_layout()
 plt.show()
+
