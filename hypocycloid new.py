@@ -51,71 +51,60 @@ r_values = np.sqrt(x_br_bb**2 + y_br_bb**2)
 # Get corresponding gravity values
 g_values = np.array([gravity_function(r) for r in r_values])
 
-# Ensure no division by zero in travel time calculation
 g_values[g_values == 0] = 1e-6  # Replace zero gravity with a small positive value
-
-# Create figure and axis for animation
-fig, ax = plt.subplots(figsize=(6, 6))
-
-# Plot the Earth as a circle
-earth_circle = plt.Circle((0, 0), R_m, color='lightblue', alpha=0.5, label="Earth")
-ax.add_patch(earth_circle)
-
-# Plot the hypocycloid path
-ax.plot(x_br_bb, y_br_bb, label="Hypocycloid Path (Bristol to Beijing)", color='orange')
-
-# Mark start and end points
-ax.scatter([x_br_bb[0], x_br_bb[-1]], [y_br_bb[0], y_br_bb[-1]], color='red', zorder=3, label="Start & End Points")
-
-# Labels and title
-ax.set_xlabel("x (m)")
-ax.set_ylabel("y (m)")
-ax.set_title("Gravity Train Hypocycloid Path: Bristol to Beijing")
-
-# Set axis limits to match Earth's scale
-ax.set_xlim(-R_m * 1.1, R_m * 1.1)
-ax.set_ylim(-R_m * 1.1, R_m * 1.1)
-ax.set_aspect('equal')
-
-# Add legend and grid
-ax.legend()
-ax.grid(True)
-
-# Animation setup
-train, = ax.plot([], [], 'ro', markersize=6)  # Train marker
-time_label = ax.text(-R_m * 0.9, -R_m * 0.9, '', fontsize=12, color='black')
-
-# Animation function
-def update(frame):
-    train.set_data([x_br_bb[frame]], [y_br_bb[frame]])  # Update train position
-    time_label.set_text(f'Time: {frame * (T_bristol_beijing / len(t)):.1f} s')  # Update time label
-    return train, time_label
-
-# Create animation
-ani = animation.FuncAnimation(fig, update, frames=len(t), interval=20, blit=True, repeat=False)
-
-# Show plot
-plt.show()
 
 # Compute velocity using energy conservation
 potential_energy = cumulative_trapezoid(g_values, r_values, initial=0)
 velocity = np.sqrt(2 * np.abs(potential_energy))  # Ensure non-negative values
 
-# Prevent division by zero in acceleration calculation
+# Compute acceleration safely
 epsilon = 1e-6
 denominator = (R_m - r_values) + epsilon  # Small epsilon added to prevent division by zero
-
-# Compute acceleration safely
 acceleration = g_values - (velocity**2 / denominator)
 
-# Remove NaN values before finding max
+# Remove NaN values
 valid_acceleration = acceleration[~np.isnan(acceleration)]
 valid_velocity = velocity[~np.isnan(velocity)]
 
-# Find maximum velocity and acceleration
-max_velocity = np.max(valid_velocity)
-max_acceleration = np.max(valid_acceleration)
+# Create figure and axes for animation
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 10))
+
+# Plot the Earth as a circle on the first subplot
+ax1.set_title("Gravity Train Hypocycloid Path: Bristol to Beijing")
+earth_circle = plt.Circle((0, 0), R_m, color='lightblue', alpha=0.5, label="Earth")
+ax1.add_patch(earth_circle)
+ax1.plot(x_br_bb, y_br_bb, label="Hypocycloid Path", color='orange')
+ax1.scatter([x_br_bb[0], x_br_bb[-1]], [y_br_bb[0], y_br_bb[-1]], color='red', zorder=3, label="Start & End Points")
+ax1.set_xlim(-R_m * 1.1, R_m * 1.1)
+ax1.set_ylim(-R_m * 1.1, R_m * 1.1)
+ax1.set_aspect('equal')
+ax1.legend()
+ax1.grid(True)
+train, = ax1.plot([], [], 'ro', markersize=6)
+
+# Velocity-Time Graph on second subplot
+ax2.set_title("Velocity vs Time")
+ax2.set_xlabel("Time Index")
+ax2.set_ylabel("Velocity (m/s)")
+ax2.set_xlim(0, len(t))
+ax2.set_ylim(0, np.max(valid_velocity) * 1.1)
+velocity_line, = ax2.plot([], [], 'b-', label="Velocity")
+ax2.legend()
+ax2.grid(True)
+
+# Animation function
+def update(frame):
+    train.set_data([x_br_bb[frame]], [y_br_bb[frame]])
+    velocity_line.set_data(range(frame + 1), valid_velocity[:frame + 1])
+    return train, velocity_line
+
+# Create animation
+ani = animation.FuncAnimation(fig, update, frames=len(t), interval=20, blit=True, repeat=False)
+
+# Show plot
+plt.tight_layout()
+plt.show()
 
 # Print the results
-print(f"Maximum velocity: {max_velocity:.2f} m/s")
-print(f"Maximum acceleration: {max_acceleration:.2f} m/s²")
+print(f"Maximum velocity: {np.max(valid_velocity):.2f} m/s")
+print(f"Maximum acceleration: {np.max(valid_acceleration):.2f} m/s²")
