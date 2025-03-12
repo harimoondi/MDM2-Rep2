@@ -38,8 +38,10 @@ print(f"Estimated travel time for Bristol to Beijing: {T_bristol_beijing_minutes
 # Compute b based on the hypocycloid property
 b_bristol_beijing_m = s_bristol_beijing_m / (2 * np.pi)
 
-# Parametric equations for the hypocycloid path
-t = np.linspace(0, 2 * np.pi, 1000)  # Parameter t
+#  Parametric equations for one cusp of the hypocycloid
+# Limit the parameter t to the first cusp
+t_max = (2 * np.pi * b_bristol_beijing_m) / R_m
+t = np.linspace(0, t_max, 500)
 x_br_bb = (R_m - b_bristol_beijing_m) * np.cos(t) + b_bristol_beijing_m * np.cos(((R_m - b_bristol_beijing_m) / b_bristol_beijing_m) * t)
 y_br_bb = (R_m - b_bristol_beijing_m) * np.sin(t) - b_bristol_beijing_m * np.sin(((R_m - b_bristol_beijing_m) / b_bristol_beijing_m) * t)
 
@@ -55,15 +57,16 @@ g_values[g_values == 0] = 1e-6  # Replace zero gravity with a small positive val
 # Generate the hypocycloid path animation
 fig, ax = plt.subplots(figsize=(6, 6))
 
+# Plot quarter Earth
 earth_circle = plt.Circle((0, 0), R_m, color='lightblue', alpha=0.5, label="Earth")
 ax.add_patch(earth_circle)
 
 # Plot the hypocycloid path
 ax.plot(x_br_bb, y_br_bb, label="Hypocycloid Path (Bristol to Beijing)", color='orange')
-ax.scatter([x_br_bb[0], x_br_bb[-1]], [y_br_bb[0], y_br_bb[-1]], color='red', zorder=3, label="Start & End Points")
+ax.scatter([x_br_bb[0], x_br_bb[-1]], [y_br_bb[0], y_br_bb[-1]], color='red', zorder=3, label="Bristol & Beijing Points")
 ax.set_xlabel("x (m)")
 ax.set_ylabel("y (m)")
-ax.set_title("Gravity Train Hypocycloid Path: Bristol to Beijing")
+ax.set_title("Hypocycloid Path: Bristol to Beijing")
 
 # Set axis limits to match Earth's scale
 ax.set_xlim(-R_m * 1.1, R_m * 1.1)
@@ -163,5 +166,3 @@ axs[1].grid(True)
 
 plt.tight_layout()
 plt.show()
-
-
